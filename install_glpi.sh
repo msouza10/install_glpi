@@ -2,6 +2,8 @@
 
 set -e
 
+#Funções do Script.
+
 function check_package() {
     dpkg -s "$1" >/dev/null 2>&1
 }
@@ -60,7 +62,9 @@ echo "Atualizando os pacotes do sistema..."
 sudo apt-get -y update
 echo "Atualização concluída."
 
-# Pacotes a serem instalados
+# Variaveis
+
+# Variavél responsavel pela instalação de pacotes.
 packages=(
   "xz-utils"
   "bzip2"
@@ -94,6 +98,13 @@ packages=(
   "npm"
 )
 
+#Versão que deseja instalar do GLPI
+version="10.0.7"            #---- Versão do GLPI que irá utilizar
+
+glpipassword=123456         #---- Senha que será usadano banco de dados.
+glpiuser=glpiuser           #---- Usuario que será utilizado na autenticação do banco de dados por parte do GLPI
+glpidb=glpidb               #---- Nome do banco de dados do GLPI.
+
 # Instalar pacotes
 for package in "${packages[@]}"; do
     install_package "$package"
@@ -124,11 +135,13 @@ fi
 # Verificar diretório /var/www/
 verify_directory "/var/www"
 
-# Clonar repositório GLPI
+# Baixar o GLPI com o Wget
 cd /var/www
 if [ ! -d "/var/www/glpi" ]; then
-    echo "Diretório /var/www/glpi não encontrado. Clonando repositório..."
-    git clone https://github.com/glpi-project/glpi.git
+    echo "Diretório /var/www/glpi não encontrado. baixando o GLPI-$version..."
+    mkdir -p /var/www/glpi/
+    "wget https://github.com/glpi-project/glpi/releases/download/$version/glpi-$version.tgz"
+    tar -xvzf "glpi-$version.tgz"
     if [ $? -ne 0 ]; then
         echo "Erro ao clonar o repositório."
         exit 1
@@ -142,15 +155,15 @@ find /var/www/glpi -type d -exec chmod 755 {} +
 find /var/www/glpi -type f -exec chmod 644 {} +
 
 # Comandos para criar o banco de dados
-mysql -e "CREATE DATABASE IF NOT EXISTS glpidb CHARACTER SET utf8"
-check_mysql_command $? "criar o banco de dados" "O banco de dados 'glpidb'"
+mysql -e "CREATE DATABASE IF NOT EXISTS $glpidb CHARACTER SET utf8"
+check_mysql_command $? "criar o banco de dados" "O banco de dados '$glpidb'"
 
 # Comandos para criar o usuário
-mysql -e "CREATE USER IF NOT EXISTS 'glpiuser'@'localhost' IDENTIFIED BY '123456'"
-check_mysql_command $? "criar o usuário 'glpiuser'" "O usuário 'glpiuser'"
+mysql -e "CREATE USER IF NOT EXISTS '$glpiuser'@'localhost' IDENTIFIED BY '$glpipassword'"
+check_mysql_command $? "criar o usuário '$glpiuser'" "O usuário '$glpiuser'"
 
 # Comandos para conceder privilégios
-mysql -e "GRANT ALL PRIVILEGES ON glpidb.* TO 'glpiuser'@'localhost' WITH GRANT OPTION"
+mysql -e "GRANT ALL PRIVILEGES ON $glpidb.* TO '$glpiuser'@'localhost' WITH GRANT OPTION"
 check_mysql_command $? "conceder privilégios ao usuário" "Os privilégios"
 
 echo "DB configurado, concluído com sucesso."
@@ -170,8 +183,10 @@ else
     exit 1
 fi
 
-php /var/www/glpi/bin/console dependencies install
 # Configurar cache com Redis
 php /var/www/glpi/bin/console cache:configure --context=core --dsn=redis://127.0.0.1:6379
-
+# Verifica os requisitos do sistema
+php /var/www/glpi/bin/console glpi:system:check_requirements
+# Faz a instalação do GLPI por meio de CLI
+php /var/www/glpi/bin/console db:install -H localhost -P  -d $glpidb -u $glpiuser -p $glpipassword
 
