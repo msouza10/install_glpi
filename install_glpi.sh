@@ -91,11 +91,8 @@ packages=(
   "php-zip"
   "php-redis"
   "php-bz2"
-  "git"
   "mariadb-server"
   "redis"
-  "nodejs"
-  "npm"
 )
 
 #Versão que deseja instalar do GLPI
@@ -139,9 +136,9 @@ verify_directory "/var/www"
 cd /var/www
 if [ ! -d "/var/www/glpi" ]; then
     echo "Diretório /var/www/glpi não encontrado. baixando o GLPI-$version..."
-    mkdir -p /var/www/glpi/
-    "wget https://github.com/glpi-project/glpi/releases/download/$version/glpi-$version.tgz"
-    tar -xvzf "glpi-$version.tgz"
+    wget https://github.com/glpi-project/glpi/releases/download/$version/glpi-$version.tgz
+    tar -xvzf glpi-$version.tgz
+    rm glpi-$version.tgz
     if [ $? -ne 0 ]; then
         echo "Erro ao clonar o repositório."
         exit 1
@@ -190,3 +187,4 @@ php /var/www/glpi/bin/console glpi:system:check_requirements
 # Faz a instalação do GLPI por meio de CLI
 php /var/www/glpi/bin/console db:install -H localhost -P  -d $glpidb -u $glpiuser -p $glpipassword
 
+echo " O GLPI foi instalado na $version e para acessar pode colocar apenas `hostname -I`"
